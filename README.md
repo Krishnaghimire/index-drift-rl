@@ -1,100 +1,121 @@
 # index-drift-rl
 
-An autonomous reinforcement learning framework for zero-downtime relational and vector index co-evolution.
+> 🚧 **Status: early work in progress / learning project.** Nothing below is trained or shipped yet — this README describes the goal and the roadmap. Progress is tracked in the [Roadmap](#-roadmap) section.
 
-`index-drift-rl` bridges the gap between traditional backend database engineering and cutting-edge post-training reinforcement learning (GRPO). It trains open-weights language models to act as autonomous database performance engineers—analyzing slow hybrid query logs, predicting index degradation, and generating production-safe, non-blocking index commands (`CREATE INDEX CONCURRENTLY` and vector quantization adjustments) across PostgreSQL and Elasticsearch.
+An open, low-budget experiment in training small open-weights language models with reinforcement learning (GRPO) to act as **database index advisors** for PostgreSQL (B-Tree + `pgvector`) and Elasticsearch (vector search).
 
----
+Given a slow-query log from a shifting ("drifting") workload, the agent should propose **production-safe** index changes — e.g. `CREATE INDEX CONCURRENTLY`, or HNSW / quantization parameter adjustments — and is rewarded by measured cost improvement in a sandbox.
 
-## 🏗️ Architecture Overview
-
-[ Shifting Workload / Query Logs ]
-│
-▼
-┌───────────────────────┐
-│  index-drift-rl Agent │  <--- (Trained via GRPO / QLoRA)
-└───────────────────────┘
-│
-▼ (Generates Safe Index Commands)
-┌─────────────────────────────────────────────────┐
-│               Containerized Sandbox             │
-│  ┌──────────────────┐    ┌───────────────────┐  │
-│  │ PostgreSQL       │    │ Elasticsearch     │  │
-│  │ (Relational /    │    │ (Vector Search /  │  │
-│  │  pgvector)       │    │  HNSW / Quant.)   │  │
-│  └──────────────────┘    └───────────────────┘  │
-└─────────────────────────────────────────────────┘
-│
-▼ (Automated Execution & Reward Feedback)
-[ EXPLAIN ANALYZE / Latency & Concurrency Validation ]
-
+The project is built in the open as a way to learn applied AI, and aims to give back to the community a **reusable benchmark dataset**, reward harness, and LoRA adapter.
 
 ---
 
-## ✨ Key Features
+## 🎯 Goals
 
-* **Hybrid Co-Evolution Engine:** Simultaneously optimizes traditional B-Tree relational indexes and modern vector search parameters under shifting multi-tenant workloads.
-* **GRPO Reinforcement Learning Loop:** Leverages Group Relative Policy Optimization (`TRL` framework) with programmatic feedback from a containerized testbed.
-* **Production Safety Guardrails:** Evaluates model outputs against execution time (`EXPLAIN ANALYZE`), memory usage, and concurrency rules to prevent table-locking and cluster degradation.
-* **Pre-Trained Specialized Agent:** Ships with fine-tuned LoRA adapter weights designed for zero-shot inference on complex enterprise query bottlenecks.
-
----
-
-## 🛠️ Tech Stack
-
-* **AI / ML:** Python, PyTorch, Hugging Face `TRL` (GRPO), PEFT / QLoRA, `Qwen/Qwen2.5-Coder-7B-Instruct`
-* **Infrastructure & Storage:** PostgreSQL (`pgvector`), Elasticsearch, Docker & Docker Compose
-* **Validation & Testing:** Custom concurrent query simulation and performance benchmarking harness
+1. **Benchmark & dataset** — synthetic multi-tenant schemas, drifting query workloads, and labelled index scenarios, published on Hugging Face Datasets.
+2. **Reward harness** — fast, programmatic scoring of index suggestions:
+   - **PostgreSQL:** [HypoPG](https://github.com/HypoPG/hypopg) hypothetical indexes + `EXPLAIN` cost deltas (no real index builds needed during training).
+   - **Vector indexes:** an offline-measured lookup table of recall@k vs. latency across HNSW / quantization parameters, so training doesn't require a live Elasticsearch cluster.
+   - **Safety checks:** SQL must parse (`pglast`), must use `CONCURRENTLY`, no destructive / locking DDL, penalties for redundant or oversized indexes.
+3. **Baselines** — rule-based advisor and zero-shot LLMs, scored by the same harness.
+4. **GRPO-trained agent** — a small model (starting with `Qwen2.5-Coder-1.5B-Instruct`) fine-tuned with QLoRA + GRPO, compared honestly against the baselines.
 
 ---
 
-## 📂 Project Directory Structure
+## 🏗️ Architecture (planned)
+
+```text
+[ Drifting workload / slow-query logs ]
+                 │
+                 ▼
+     ┌───────────────────────┐
+     │  index-drift-rl agent │   ← small LLM, QLoRA + GRPO (TRL / Unsloth)
+     └───────────────────────┘
+                 │  proposed index commands
+                 ▼
+┌──────────────────────────────────────────────────┐
+│                 Reward harness                    │
+│  ┌──────────────────────┐  ┌──────────────────┐  │
+│  │ PostgreSQL + pgvector│  │ Vector-param     │  │
+│  │ + HypoPG (EXPLAIN    │  │ lookup table     │  │
+│  │   cost delta)        │  │ (recall/latency) │  │
+│  └──────────────────────┘  └──────────────────┘  │
+│        + SQL safety / guardrail checks            │
+└──────────────────────────────────────────────────┘
+                 │
+                 ▼
+            scalar reward → GRPO update
+```
+
+---
+
+## 💸 Low-budget design
+
+This project is deliberately built to run on **modest hardware and free tiers**:
+
+| Task | Where |
+|---|---|
+| Sandbox DBs (Postgres + pgvector + HypoPG, single-node Elasticsearch) | Local, Docker Desktop on WSL2 (16 GB RAM is enough) |
+| Zero-shot baselines | Local CPU via Ollama |
+| Vector-parameter benchmarking (offline table) | Local |
+| GRPO training | Free GPU notebooks (Kaggle / Google Colab), 4-bit QLoRA via Unsloth |
+| Model, dataset, demo hosting | Hugging Face Hub & Spaces (free) |
+
+---
+
+## 🛠️ Tech stack
+
+- **AI / ML:** Python, PyTorch, Hugging Face `TRL` (GRPO), PEFT / QLoRA, Unsloth, `Qwen2.5-Coder` (1.5B → 3B/7B later)
+- **Databases:** PostgreSQL + `pgvector` + `HypoPG`, Elasticsearch
+- **Tooling:** Docker Compose, `pglast` (SQL parsing), pytest
+
+---
+
+## 📂 Planned directory structure
 
 ```text
 index-drift-rl/
-├── .github/
-│   └── workflows/          # CI/CD pipelines and linting
 ├── configs/
-│   └── grpo_config.yaml    # Training hyperparameters and environment settings
+│   └── grpo_config.yaml        # training hyperparameters
 ├── docker/
-│   └── docker-compose.yml  # Local sandbox for PostgreSQL and Elasticsearch
-├── logs/
-│   └── sample_slow_queries.json # Sample multi-tenant slow query dataset
+│   └── docker-compose.yml      # local Postgres + Elasticsearch sandbox
+├── data/                       # generated schemas, workloads, scenarios
+├── notebooks/                  # Kaggle / Colab training notebooks
 ├── src/
-│   ├── __init__.py
-│   ├── agent.py            # Model loading, quantization, and PEFT setup
-│   ├── environment.py      # Sandbox execution and reward function logic
-│   ├── inference.py        # CLI entrypoint for zero-shot query optimization
-│   └── train.py            # GRPOTrainer execution loop
-├── .gitignore
-├── LICENSE
+│   ├── workload.py             # schema + drifting workload generator
+│   ├── environment.py          # reward harness (HypoPG cost, safety checks)
+│   ├── baselines.py            # rule-based + zero-shot LLM baselines
+│   ├── train.py                # GRPO training loop
+│   └── inference.py            # CLI: suggest indexes for a query log
+├── tests/
 ├── requirements.txt
 └── README.md
-🚀 Quick Start (Local Setup)
-1. Clone the Repository
-Bash
-git clone [https://github.com/Krishnaghimire/index-drift-rl.git](https://github.com/Krishnaghimire/index-drift-rl.git)
-cd index-drift-rl
-2. Spin Up the Testbed Sandbox
-Start the containerized PostgreSQL and Elasticsearch instances using Docker Compose:
+```
 
-Bash
-docker-compose -f docker/docker-compose.yml up -d
-3. Install Dependencies
-Bash
-pip install -r requirements.txt
-4. Run Inference with the Pre-Trained Agent
-Test the agent against a sample slow query log:
+---
 
-Bash
-python -m src.inference --query-log="logs/sample_slow_queries.json"
-📊 Training Your Own Agent
-If you want to run the GRPO reinforcement learning loop locally or on a cloud GPU (e.g., RunPod/Lambda Labs):
+## 🗺️ Roadmap
 
-Bash
-python -m src.train --config configs/grpo_config.yaml
-🤝 Contributing
-Contributions, issues, and feature requests are welcome! Feel free to check the issues page.
+- [ ] **Phase 1 — Sandbox:** Docker Compose for Postgres (pgvector + HypoPG) and Elasticsearch; synthetic multi-tenant schema; drifting workload generator
+- [ ] **Phase 2 — Dataset:** generate slow-query scenarios with labelled good indexes; publish to Hugging Face Datasets
+- [ ] **Phase 3 — Baselines:** rule-based advisor + zero-shot LLM baselines
+- [ ] **Phase 4 — Reward harness:** HypoPG cost-delta reward + SQL safety checks, with unit tests
+- [ ] **Phase 5 — Training:** optional SFT warm-up for output format, then GRPO on free GPU (Kaggle / Colab)
+- [ ] **Phase 6 — Vector indexes:** offline HNSW / quantization benchmark table and vector-tuning task
+- [ ] **Phase 7 — Release:** LoRA adapter on HF Hub, Gradio demo Space, write-up comparing against baselines
 
-📝 License
-Distributed under the MIT License. See LICENSE for more information.
+---
+
+## 🚀 Getting started
+
+Code is not available yet — setup instructions will be added as Phase 1 lands.
+
+---
+
+## 🤝 Contributing
+
+This is a learning project and feedback is very welcome — especially on workload realism, reward design, and safety rules. Feel free to open an issue or discussion.
+
+## 📝 License
+
+MIT (license file to be added).
