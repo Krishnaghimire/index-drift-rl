@@ -62,6 +62,19 @@ def test_orders_belong_to_customer_tenant(pg):
     assert mismatched == 0
 
 
+def test_hypothetical_index_lowers_cost_and_cleans_up(pg):
+    from src.hypo import HypoSession
+
+    hypo = HypoSession(pg)
+    sql = "SELECT * FROM events WHERE customer_id = %(c)s"
+    params = {"c": 42}
+    before = hypo.cost(sql, params)
+    after = hypo.cost(sql, params, ["CREATE INDEX ON events (customer_id)"])
+    assert after < before / 10
+    assert hypo.cost(sql, params, ["CREATE INDEX ON events (no_such_column)"]) is None
+    assert pg.execute("SELECT count(*) FROM hypopg_list_indexes").fetchone()[0] == 0
+
+
 @pytest.mark.parametrize("name", sorted(workload.TEMPLATES))
 def test_template_runs_and_finds_rows(pg, spec, name):
     template = workload.TEMPLATES[name]

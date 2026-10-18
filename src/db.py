@@ -49,6 +49,44 @@ def has_extension(conn, name: str) -> bool:
     return row is not None
 
 
+def columns_by_table(conn, tables=DRIFT_TABLES) -> dict[str, set[str]]:
+    rows = conn.execute(
+        "SELECT table_name, column_name FROM information_schema.columns "
+        "WHERE table_schema = 'public' AND table_name = ANY(%s)", (list(tables),)).fetchall()
+    out: dict[str, set[str]] = {}
+    for table, column in rows:
+        out.setdefault(table, set()).add(column)
+    return out
+
+
+def primary_keys(conn, tables=DRIFT_TABLES) -> dict[str, tuple[str, ...]]:
+    rows = conn.execute(
+        """
+        SELECT t.relname, array_agg(a.attname ORDER BY k.ord)
+        FROM pg_index i
+        JOIN pg_class t ON t.oid = i.indrelid
+        CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS k(attnum, ord)
+        JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+        WHERE i.indisprimary AND t.relname = ANY(%s)
+        GROUP BY t.relname
+        """, (list(tables),)).fetchall()
+    return {table: tuple(cols) for table, cols in rows}
+
+
+def table_ddl(conn, table: str) -> str:
+    """Compact CREATE TABLE text with a row-count estimate, for prompts."""
+    columns = conn.execute(
+        "SELECT a.attname, format_type(a.atttypid, a.atttypmod), a.attnotnull "
+        "FROM pg_attribute a WHERE a.attrelid = %s::regclass AND a.attnum > 0 AND NOT a.attisdropped "
+        "ORDER BY a.attnum", (table,)).fetchall()
+    parts = [f"{name} {typ}{' NOT NULL' if notnull else ''}" for name, typ, notnull in columns]
+    parts += [r[0] for r in conn.execute(
+        "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = %s::regclass AND contype = 'p'",
+        (table,)).fetchall()]
+    rows = conn.execute("SELECT reltuples::bigint FROM pg_class WHERE oid = %s::regclass", (table,)).fetchone()[0]
+    return f"CREATE TABLE {table} ({', '.join(parts)});  -- ~{rows:,} rows"
+
+
 def dataset_meta(conn) -> dict | None:
     """The DatasetSpec dict written by ``src.seed load``, or None if not seeded."""
     if conn.execute("SELECT to_regclass('public.drift_meta')").fetchone()[0] is None:

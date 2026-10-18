@@ -87,6 +87,11 @@ index-drift-rl/
 │   ├── seed.py                 # CLI: load / status / drop-indexes
 │   ├── workload.py             # CLI: drifting workload generator + replay runner
 │   ├── es_sync.py              # CLI: copy product embeddings into Elasticsearch
+│   ├── query_features.py       # parse SQL (pglast) into index-relevant features
+│   ├── candidates.py           # rule-based index candidate generator
+│   ├── hypo.py                 # cost queries under hypothetical indexes (HypoPG)
+│   ├── build_dataset.py        # CLI: build the labelled benchmark dataset
+│   ├── publish_dataset.py      # CLI: upload the dataset to the Hugging Face Hub
 │   ├── db.py, config.py        # helpers
 │   ├── environment.py          # (Phase 4) reward harness
 │   ├── baselines.py            # (Phase 3) rule-based + zero-shot LLM baselines
@@ -118,12 +123,31 @@ ship with **primary keys only**: picking indexes is the agent's job.
 `payload->>'source'`), covering, join and HNSW index opportunities. See
 `python -m src.workload list`.
 
+### The benchmark dataset (Phase 2)
+
+`python -m src.build_dataset --validate` turns the drifting workloads into two
+labelled tasks (~2 minutes at scale 1.0):
+
+| Task | Input | Label | Rows (train / test / unseen templates) |
+|---|---|---|---|
+| `single` | slow query + `EXPLAIN` plan + schema | best single index, or none | 2488 / 829 / 163 |
+| `windows` | a window of the query log + indexes left from the previous window | index set to have now (≤ 3): what to create, what to drop | 96 / 32 / – |
+
+Labels come from rule-generated candidates scored as **hypothetical indexes**
+with HypoPG, so nothing is built. The smallest index within 2% of the best
+planner-cost reduction wins. `--validate` then builds each template's most
+common label for real. At scale 1.0, 9 of 10 templates sped up on every
+sampled query (median 6× to 116×). One template (`top_products`) shows the
+limits of planner estimates: a 5× median speedup, but slower for the
+dominant tenant. The generated dataset card (`data/dataset/README.md`) records
+all of this.
+
 ---
 
 ## 🗺️ Roadmap
 
 - [x] **Phase 1 — Sandbox:** Docker Compose for Postgres (pgvector + HypoPG) and Elasticsearch; synthetic multi-tenant schema; drifting workload generator
-- [ ] **Phase 2 — Dataset:** generate slow-query scenarios with labelled good indexes; publish to Hugging Face Datasets
+- [ ] **Phase 2 — Dataset:** generate slow-query scenarios with labelled good indexes; publish to Hugging Face Datasets — 🔨 *dataset builds and validates locally; not yet published*
 - [ ] **Phase 3 — Baselines:** rule-based advisor + zero-shot LLM baselines
 - [ ] **Phase 4 — Reward harness:** HypoPG cost-delta reward + SQL safety checks, with unit tests
 - [ ] **Phase 5 — Training:** optional SFT warm-up for output format, then GRPO on free GPU (Kaggle / Colab)
@@ -156,6 +180,10 @@ python -m src.workload run data/workloads/full.jsonl --out data/runs/baseline
 # 5. Optional: mirror product embeddings into Elasticsearch
 docker compose -f docker/docker-compose.yml --profile es up -d
 python -m src.es_sync --verify
+
+# 6. Build the labelled dataset (Phase 2) and optionally publish it
+python -m src.build_dataset --out data/dataset --validate
+python -m src.publish_dataset --repo <hf-user>/index-drift-rl-bench   # private by default
 
 # Tests (DB tests are skipped unless the sandbox is up and seeded)
 pytest
