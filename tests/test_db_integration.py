@@ -75,6 +75,23 @@ def test_hypothetical_index_lowers_cost_and_cleans_up(pg):
     assert pg.execute("SELECT count(*) FROM hypopg_list_indexes").fetchone()[0] == 0
 
 
+def test_score_single_separates_good_and_bad_answers(pg):
+    from src.evaluate import score_single
+    from src.hypo import HypoSession
+
+    hypo = HypoSession(pg)
+    example = {"id": "t", "template": "customer_by_email", "tables": ["customers"],
+               "sql": workload.TEMPLATES["customer_by_email"].sql, "params": {"email": "user42@example.com"},
+               "label": {"ddl": "CREATE INDEX CONCURRENTLY x ON customers ((lower(email)))",
+                         "reduction": 0.6, "size_bytes": 1}}
+    good = score_single(example, "CREATE INDEX CONCURRENTLY a ON customers (lower(email));", hypo)
+    plain = score_single(example, "CREATE INDEX CONCURRENTLY b ON customers (email);", hypo)
+    broken = score_single(example, "CREATE INDEX ON customers (no_such_column);", hypo)
+    assert good["solved"] and good["exact_match"] and good["capture"] == 1.0
+    assert not plain["solved"] and plain["reduction"] < 0.05  # index on email can't serve lower(email)
+    assert not broken["valid"]
+
+
 @pytest.mark.parametrize("name", sorted(workload.TEMPLATES))
 def test_template_runs_and_finds_rows(pg, spec, name):
     template = workload.TEMPLATES[name]

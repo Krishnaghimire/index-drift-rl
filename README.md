@@ -92,9 +92,11 @@ index-drift-rl/
 │   ├── hypo.py                 # cost queries under hypothetical indexes (HypoPG)
 │   ├── build_dataset.py        # CLI: build the labelled benchmark dataset
 │   ├── publish_dataset.py      # CLI: upload the dataset to the Hugging Face Hub
+│   ├── prompts.py              # prompt format + answer parsing (shared with training)
+│   ├── evaluate.py             # score answers with HypoPG against the labels
+│   ├── baselines.py            # CLI: rule-based + zero-shot LLM baselines, report
 │   ├── db.py, config.py        # helpers
 │   ├── environment.py          # (Phase 4) reward harness
-│   ├── baselines.py            # (Phase 3) rule-based + zero-shot LLM baselines
 │   └── train.py                # (Phase 5) GRPO training loop
 ├── tests/
 ├── requirements.txt
@@ -151,13 +153,31 @@ limits of planner estimates: a 5× median speedup, but slower for the
 dominant tenant. The generated dataset card (`data/dataset/README.md`) records
 all of this.
 
+### Baselines (Phase 3)
+
+Every answer is scored with HypoPG against the label. *Solved* means its
+cost reduction is within 2% of the label's; *capture* is the share of the
+label's improvement achieved. Full table: [docs/results/baselines.md](docs/results/baselines.md).
+
+| Baseline | Test: solved / capture | Unseen templates: solved / capture |
+|---|---|---|
+| Textbook rule (equality → range/sort columns) | 90% / 98% | 66% / 96% |
+| Qwen2.5-Coder-1.5B, zero-shot (untrained) | 52% / 69% | 5% / 36% |
+| No index | 0% / 0% | 0% / 0% |
+
+The untrained model makes classic mistakes: it indexes `email` when queries
+filter on `lower(email)`, indexes the low-selectivity `status` column instead
+of using a partial index, emits invalid JSONB index syntax, and puts range
+columns first. The target for training is to beat the rule baseline,
+especially on unseen templates, while staying 100% valid and `CONCURRENTLY`.
+
 ---
 
 ## 🗺️ Roadmap
 
 - [x] **Phase 1 — Sandbox:** Docker Compose for Postgres (pgvector + HypoPG) and Elasticsearch; synthetic multi-tenant schema; drifting workload generator
 - [x] **Phase 2 — Dataset:** generate slow-query scenarios with labelled good indexes; publish to Hugging Face Datasets — 🤗 [krishna382nitjsr/index-drift-rl-bench](https://huggingface.co/datasets/krishna382nitjsr/index-drift-rl-bench)
-- [ ] **Phase 3 — Baselines:** rule-based advisor + zero-shot LLM baselines
+- [x] **Phase 3 — Baselines:** rule-based advisor + zero-shot LLM baselines — [results](docs/results/baselines.md)
 - [ ] **Phase 4 — Reward harness:** HypoPG cost-delta reward + SQL safety checks, with unit tests
 - [ ] **Phase 5 — Training:** optional SFT warm-up for output format, then GRPO on free GPU (Kaggle / Colab)
 - [ ] **Phase 6 — Vector indexes:** offline HNSW / quantization benchmark table and vector-tuning task
@@ -193,6 +213,11 @@ python -m src.es_sync --verify
 # 6. Build the labelled dataset (Phase 2) and optionally publish it
 python -m src.build_dataset --out data/dataset --validate
 python -m src.publish_dataset --repo <hf-user>/index-drift-rl-bench   # private by default
+
+# 7. Baselines (Phase 3). LLM baselines need Ollama: `ollama pull qwen2.5-coder:1.5b`
+python -m src.baselines run --baseline rule --split test
+python -m src.baselines run --baseline ollama:qwen2.5-coder:1.5b --split test --limit 200
+python -m src.baselines report      # writes docs/results/baselines.md
 
 # Tests (DB tests are skipped unless the sandbox is up and seeded)
 pytest
