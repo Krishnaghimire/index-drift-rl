@@ -25,6 +25,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if not (args.path / "README.md").exists():
         raise SystemExit(f"{args.path} has no README.md - run python -m src.build_dataset first")
+    card = args.path / "README.md"
+    card.write_text(card.read_text(encoding="utf-8").replace("<user>/index-drift-rl-bench", args.repo),
+                    encoding="utf-8")
+
     api = HfApi()
     api.create_repo(args.repo, repo_type="dataset", private=not args.public, exist_ok=True)
     api.upload_folder(repo_id=args.repo, repo_type="dataset", folder_path=str(args.path),
