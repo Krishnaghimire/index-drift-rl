@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Generated workloads, runs, benchmarks
+data/*
+!data/README.md
+
+# Model artifacts (published to the Hugging Face Hub instead)
+checkpoints/
+outputs/
+*.safetensors
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.env

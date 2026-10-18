@@ -71,32 +71,58 @@ This project is deliberately built to run on **modest hardware and free tiers**:
 
 ---
 
-## 📂 Planned directory structure
+## 📂 Directory structure
 
 ```text
 index-drift-rl/
-├── configs/
-│   └── grpo_config.yaml        # training hyperparameters
 ├── docker/
-│   └── docker-compose.yml      # local Postgres + Elasticsearch sandbox
-├── data/                       # generated schemas, workloads, scenarios
-├── notebooks/                  # Kaggle / Colab training notebooks
+│   ├── docker-compose.yml      # Postgres (pgvector + HypoPG) + optional Elasticsearch
+│   └── postgres/               # image build + init scripts
+├── docs/
+│   └── windows-setup.md        # WSL2 / Docker Desktop / Python setup
+├── data/                       # generated workloads and runs (git-ignored)
 ├── src/
-│   ├── workload.py             # schema + drifting workload generator
-│   ├── environment.py          # reward harness (HypoPG cost, safety checks)
-│   ├── baselines.py            # rule-based + zero-shot LLM baselines
-│   ├── train.py                # GRPO training loop
-│   └── inference.py            # CLI: suggest indexes for a query log
+│   ├── dataset.py              # dataset spec shared by seeder and workload generator
+│   ├── sql/schema.sql          # multi-tenant schema (primary keys only)
+│   ├── seed.py                 # CLI: load / status / drop-indexes
+│   ├── workload.py             # CLI: drifting workload generator + replay runner
+│   ├── es_sync.py              # CLI: copy product embeddings into Elasticsearch
+│   ├── db.py, config.py        # helpers
+│   ├── environment.py          # (Phase 4) reward harness
+│   ├── baselines.py            # (Phase 3) rule-based + zero-shot LLM baselines
+│   └── train.py                # (Phase 5) GRPO training loop
 ├── tests/
 ├── requirements.txt
 └── README.md
 ```
 
+### The sandbox dataset
+
+A synthetic multi-tenant commerce database: `tenants`, `customers`, `products`
+(with 64-d embeddings clustered by category), `orders`, `order_items`, `events`
+(JSONB payload). At `--scale 1.0` that is ~1M orders, ~3M order items and 2M
+events (~600 MB). Tenants are Zipf-skewed (tenant 1 owns ~27% of rows) and
+order statuses are skewed (5% `pending`), so selectivity varies a lot. Tables
+ship with **primary keys only**: picking indexes is the agent's job.
+
+### Drift scenarios
+
+| Scenario | What changes |
+|---|---|
+| `oltp_to_analytics` | point lookups gradually give way to date-range aggregates and joins |
+| `vector_launch` | a recommendation feature launches: nearest-neighbour queries ramp up |
+| `tenant_onboarding` | the smallest tenant suddenly receives 60% of traffic |
+| `full` | all of the above, chained |
+
+12 query templates cover composite, partial, expression (`lower(email)`,
+`payload->>'source'`), covering, join and HNSW index opportunities. See
+`python -m src.workload list`.
+
 ---
 
 ## 🗺️ Roadmap
 
-- [ ] **Phase 1 — Sandbox:** Docker Compose for Postgres (pgvector + HypoPG) and Elasticsearch; synthetic multi-tenant schema; drifting workload generator
+- [x] **Phase 1 — Sandbox:** Docker Compose for Postgres (pgvector + HypoPG) and Elasticsearch; synthetic multi-tenant schema; drifting workload generator
 - [ ] **Phase 2 — Dataset:** generate slow-query scenarios with labelled good indexes; publish to Hugging Face Datasets
 - [ ] **Phase 3 — Baselines:** rule-based advisor + zero-shot LLM baselines
 - [ ] **Phase 4 — Reward harness:** HypoPG cost-delta reward + SQL safety checks, with unit tests
@@ -108,7 +134,40 @@ index-drift-rl/
 
 ## 🚀 Getting started
 
-Code is not available yet — setup instructions will be added as Phase 1 lands.
+Prerequisites: Docker Desktop (WSL2) and Python 3.11+. On Windows, follow
+[docs/windows-setup.md](docs/windows-setup.md) first.
+
+```bash
+# 1. Python environment (Windows: .\.venv\Scripts\Activate.ps1)
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# 2. Start the sandbox (Postgres only; add `--profile es` for Elasticsearch)
+docker compose -f docker/docker-compose.yml up -d --build
+
+# 3. Load the synthetic dataset (use --scale 0.1 for a ~1-minute quick start)
+python -m src.seed load --scale 1.0
+python -m src.seed status
+
+# 4. Generate a drifting workload and replay it against the baseline (no indexes)
+python -m src.workload generate --scenario full -n 2000 --scale 1.0 --out data/workloads/full.jsonl
+python -m src.workload run data/workloads/full.jsonl --out data/runs/baseline
+
+# 5. Optional: mirror product embeddings into Elasticsearch
+docker compose -f docker/docker-compose.yml --profile es up -d
+python -m src.es_sync --verify
+
+# Tests (DB tests are skipped unless the sandbox is up and seeded)
+pytest
+```
+
+`data/runs/baseline/slow_queries.json` lists the slow query groups per drift
+phase with an example query and its `EXPLAIN` plan. This is the input the
+agent will learn from.
+
+To experiment by hand, create an index (`CREATE INDEX CONCURRENTLY ...` in
+`psql`), replay the same log into a new `--out` directory and compare. Run
+`python -m src.seed drop-indexes` to get back to the baseline.
 
 ---
 
@@ -118,4 +177,4 @@ This is a learning project and feedback is very welcome — especially on worklo
 
 ## 📝 License
 
-MIT (license file to be added).
+MIT, see [LICENSE](LICENSE).

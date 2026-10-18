@@ -1,0 +1,5 @@
+# Phase 1: sandbox, data generation, workload replay.
+# ML / training dependencies will live in a separate file (they target Kaggle/Colab, not this laptop).
+psycopg[binary]>=3.2,<4
+elasticsearch>=8.17,<9
+pytest>=8
