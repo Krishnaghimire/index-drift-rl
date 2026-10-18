@@ -125,6 +125,15 @@ ship with **primary keys only**: picking indexes is the agent's job.
 
 ### The benchmark dataset (Phase 2)
 
+📦 Published on the Hugging Face Hub:
+[**krishna382nitjsr/index-drift-rl-bench**](https://huggingface.co/datasets/krishna382nitjsr/index-drift-rl-bench)
+
+```python
+from datasets import load_dataset
+single = load_dataset("krishna382nitjsr/index-drift-rl-bench", "single")
+windows = load_dataset("krishna382nitjsr/index-drift-rl-bench", "windows")
+```
+
 `python -m src.build_dataset --validate` turns the drifting workloads into two
 labelled tasks (~2 minutes at scale 1.0):
 
@@ -147,7 +156,7 @@ all of this.
 ## 🗺️ Roadmap
 
 - [x] **Phase 1 — Sandbox:** Docker Compose for Postgres (pgvector + HypoPG) and Elasticsearch; synthetic multi-tenant schema; drifting workload generator
-- [ ] **Phase 2 — Dataset:** generate slow-query scenarios with labelled good indexes; publish to Hugging Face Datasets — 🔨 *dataset builds and validates locally; not yet published*
+- [x] **Phase 2 — Dataset:** generate slow-query scenarios with labelled good indexes; publish to Hugging Face Datasets — 🤗 [krishna382nitjsr/index-drift-rl-bench](https://huggingface.co/datasets/krishna382nitjsr/index-drift-rl-bench)
 - [ ] **Phase 3 — Baselines:** rule-based advisor + zero-shot LLM baselines
 - [ ] **Phase 4 — Reward harness:** HypoPG cost-delta reward + SQL safety checks, with unit tests
 - [ ] **Phase 5 — Training:** optional SFT warm-up for output format, then GRPO on free GPU (Kaggle / Colab)
