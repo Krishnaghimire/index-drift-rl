@@ -181,7 +181,7 @@ especially on unseen templates, while staying 100% valid and `CONCURRENTLY`.
 - [x] **Phase 2 — Dataset:** generate slow-query scenarios with labelled good indexes; publish to Hugging Face Datasets — 🤗 [krishna382nitjsr/index-drift-rl-bench](https://huggingface.co/datasets/krishna382nitjsr/index-drift-rl-bench)
 - [x] **Phase 3 — Baselines:** rule-based advisor + zero-shot LLM baselines — [results](docs/results/baselines.md)
 - [x] **Phase 4 — Reward harness:** HypoPG cost-delta reward + SQL safety checks, with unit tests — [design & audit](docs/results/reward_audit.md)
-- [ ] **Phase 5 — Training:** optional SFT warm-up for output format, then GRPO on free GPU (Kaggle / Colab) — 🔨 *run 1 done: test solved 37% → 97%, no gain on unseen templates* ([results](docs/results/training_run1.md)); next: more diverse training data
+- [ ] **Phase 5 — Training:** optional SFT warm-up for output format, then GRPO on free GPU (Kaggle / Colab) — 🔨 *run 1 done: test solved 37% → 97%, no gain on unseen templates* ([results](docs/results/training_run1.md), 🤗 [adapter v0.1](https://huggingface.co/krishna382nitjsr/index-drift-rl-qwen1.5b-grpo-v0.1)); next: more diverse training data
 - [ ] **Phase 6 — Vector indexes:** offline HNSW / quantization benchmark table and vector-tuning task
 - [ ] **Phase 7 — Release:** LoRA adapter on HF Hub, Gradio demo Space, write-up comparing against baselines
 
