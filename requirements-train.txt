@@ -1,0 +1,8 @@
+# Phase 5 training (Kaggle / Colab GPU). Versions tested together; torch comes with the notebook image.
+-r requirements.txt
+trl==1.16.0
+peft==0.21.2
+transformers==5.20.1
+datasets==5.1.0
+accelerate==1.15.0
+huggingface_hub==2.2.0

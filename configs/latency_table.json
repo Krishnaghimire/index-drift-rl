@@ -1,0 +1,236 @@
+{
+  "note": "Real latency of common answers vs no index; slower = >10% slower than before.",
+  "entries": [
+    {
+      "template": "customer_by_email",
+      "canonical": "CREATE INDEX ON customers ((lower(email)))",
+      "n": 12,
+      "median_speedup": 59.87,
+      "slower_share": 0.0
+    },
+    {
+      "template": "customer_recent_events",
+      "canonical": "CREATE INDEX ON events (customer_id, created_at DESC) INCLUDE (event_type, payload)",
+      "n": 12,
+      "median_speedup": 70.42,
+      "slower_share": 0.0
+    },
+    {
+      "template": "customer_recent_events",
+      "canonical": "CREATE INDEX ON events (customer_id, created_at DESC)",
+      "n": 12,
+      "median_speedup": 90.1,
+      "slower_share": 0.0
+    },
+    {
+      "template": "customer_recent_events",
+      "canonical": "CREATE INDEX ON events (customer_id)",
+      "n": 12,
+      "median_speedup": 50.43,
+      "slower_share": 0.0
+    },
+    {
+      "template": "customer_recent_events",
+      "canonical": "CREATE INDEX ON events (created_at)",
+      "n": 12,
+      "median_speedup": 1.04,
+      "slower_share": 0.08
+    },
+    {
+      "template": "events_by_source",
+      "canonical": "CREATE INDEX ON events (tenant_id, (payload ->> 'source'), created_at)",
+      "n": 12,
+      "median_speedup": 5.73,
+      "slower_share": 0.0
+    },
+    {
+      "template": "events_by_source",
+      "canonical": "CREATE INDEX ON events (tenant_id, (payload ->> 'source'))",
+      "n": 12,
+      "median_speedup": 3.81,
+      "slower_share": 0.0
+    },
+    {
+      "template": "events_by_source",
+      "canonical": "CREATE INDEX ON events ((payload ->> 'source'), tenant_id)",
+      "n": 12,
+      "median_speedup": 3.8,
+      "slower_share": 0.0
+    },
+    {
+      "template": "low_stock_products",
+      "canonical": "CREATE INDEX ON products (tenant_id, stock) INCLUDE (id, sku)",
+      "n": 12,
+      "median_speedup": 9.74,
+      "slower_share": 0.0
+    },
+    {
+      "template": "low_stock_products",
+      "canonical": "CREATE INDEX ON products (tenant_id) WHERE stock < 5",
+      "n": 12,
+      "median_speedup": 7.8,
+      "slower_share": 0.0
+    },
+    {
+      "template": "low_stock_products",
+      "canonical": "CREATE INDEX ON products (tenant_id, stock)",
+      "n": 12,
+      "median_speedup": 8.93,
+      "slower_share": 0.0
+    },
+    {
+      "template": "orders_by_customer",
+      "canonical": "CREATE INDEX ON orders (tenant_id, customer_id, created_at DESC) INCLUDE (id, status, total)",
+      "n": 12,
+      "median_speedup": 37.7,
+      "slower_share": 0.0
+    },
+    {
+      "template": "orders_by_customer",
+      "canonical": "CREATE INDEX ON orders (tenant_id, customer_id)",
+      "n": 12,
+      "median_speedup": 35.41,
+      "slower_share": 0.0
+    },
+    {
+      "template": "orders_by_customer",
+      "canonical": "CREATE INDEX ON orders (customer_id, tenant_id)",
+      "n": 12,
+      "median_speedup": 36.4,
+      "slower_share": 0.0
+    },
+    {
+      "template": "orders_by_customer",
+      "canonical": "CREATE INDEX ON orders (tenant_id, customer_id, created_at DESC)",
+      "n": 12,
+      "median_speedup": 34.12,
+      "slower_share": 0.0
+    },
+    {
+      "template": "pending_orders",
+      "canonical": "CREATE INDEX ON orders (tenant_id, created_at) WHERE status = 'pending'",
+      "n": 12,
+      "median_speedup": 9.63,
+      "slower_share": 0.0
+    },
+    {
+      "template": "pending_orders",
+      "canonical": "CREATE INDEX ON orders (tenant_id, created_at)",
+      "n": 12,
+      "median_speedup": 7.73,
+      "slower_share": 0.0
+    },
+    {
+      "template": "pending_orders",
+      "canonical": "CREATE INDEX ON orders (tenant_id) WHERE status = 'pending'",
+      "n": 12,
+      "median_speedup": 14.26,
+      "slower_share": 0.0
+    },
+    {
+      "template": "pending_orders",
+      "canonical": "CREATE INDEX ON orders (created_at) WHERE status = 'pending'",
+      "n": 12,
+      "median_speedup": 1.91,
+      "slower_share": 0.0
+    },
+    {
+      "template": "pending_orders",
+      "canonical": "CREATE INDEX ON orders (tenant_id, created_at) INCLUDE (customer_id, id, total)",
+      "n": 12,
+      "median_speedup": 7.42,
+      "slower_share": 0.0
+    },
+    {
+      "template": "product_sales",
+      "canonical": "CREATE INDEX ON order_items (product_id) INCLUDE (order_id, quantity)",
+      "n": 12,
+      "median_speedup": 97.56,
+      "slower_share": 0.0
+    },
+    {
+      "template": "product_sales",
+      "canonical": "CREATE INDEX ON order_items (product_id)",
+      "n": 12,
+      "median_speedup": 67.11,
+      "slower_share": 0.0
+    },
+    {
+      "template": "products_in_price_band",
+      "canonical": "CREATE INDEX ON products (tenant_id, category, price) INCLUDE (id, sku)",
+      "n": 12,
+      "median_speedup": 11.7,
+      "slower_share": 0.0
+    },
+    {
+      "template": "products_in_price_band",
+      "canonical": "CREATE INDEX ON products (tenant_id, category) INCLUDE (id, price, sku)",
+      "n": 12,
+      "median_speedup": 6.03,
+      "slower_share": 0.0
+    },
+    {
+      "template": "products_in_price_band",
+      "canonical": "CREATE INDEX ON products (category, tenant_id) INCLUDE (id, price, sku)",
+      "n": 12,
+      "median_speedup": 6.62,
+      "slower_share": 0.0
+    },
+    {
+      "template": "tenant_daily_revenue",
+      "canonical": "CREATE INDEX ON orders (tenant_id, created_at) WHERE status <> 'cancelled'",
+      "n": 12,
+      "median_speedup": 7.03,
+      "slower_share": 0.0
+    },
+    {
+      "template": "tenant_daily_revenue",
+      "canonical": "CREATE INDEX ON orders (tenant_id, created_at)",
+      "n": 12,
+      "median_speedup": 6.52,
+      "slower_share": 0.0
+    },
+    {
+      "template": "tenant_daily_revenue",
+      "canonical": "CREATE INDEX ON orders (tenant_id, created_at) INCLUDE (total)",
+      "n": 12,
+      "median_speedup": 6.03,
+      "slower_share": 0.0
+    },
+    {
+      "template": "top_products",
+      "canonical": "CREATE INDEX ON orders (tenant_id, created_at)",
+      "n": 12,
+      "median_speedup": 2.96,
+      "slower_share": 0.0
+    },
+    {
+      "template": "top_products",
+      "canonical": "CREATE INDEX ON orders (tenant_id, created_at) INCLUDE (id)",
+      "n": 12,
+      "median_speedup": 4.04,
+      "slower_share": 0.08
+    },
+    {
+      "template": "top_products",
+      "canonical": "CREATE INDEX ON orders (tenant_id)",
+      "n": 12,
+      "median_speedup": 1.79,
+      "slower_share": 0.0
+    },
+    {
+      "template": "top_products",
+      "canonical": "CREATE INDEX ON orders (created_at)",
+      "n": 12,
+      "median_speedup": 1.84,
+      "slower_share": 0.0
+    },
+    {
+      "template": "top_products",
+      "canonical": "CREATE INDEX ON order_items (order_id)",
+      "n": 12,
+      "median_speedup": 1.01,
+      "slower_share": 0.08
+    }
+  ]
+}
