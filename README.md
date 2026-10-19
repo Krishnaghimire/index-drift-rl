@@ -96,8 +96,10 @@ index-drift-rl/
 │   ├── evaluate.py             # score answers with HypoPG against the labels
 │   ├── baselines.py            # CLI: rule-based + zero-shot LLM baselines, report
 │   ├── db.py, config.py        # helpers
-│   ├── environment.py          # (Phase 4) reward harness
+│   ├── environment.py          # RL reward (single + windows tasks), TRL adapter, latency calibration
 │   └── train.py                # (Phase 5) GRPO training loop
+├── scripts/
+│   └── setup_notebook_postgres.sh  # Postgres + HypoPG inside Kaggle / Colab
 ├── tests/
 ├── requirements.txt
 └── README.md
@@ -178,7 +180,7 @@ especially on unseen templates, while staying 100% valid and `CONCURRENTLY`.
 - [x] **Phase 1 — Sandbox:** Docker Compose for Postgres (pgvector + HypoPG) and Elasticsearch; synthetic multi-tenant schema; drifting workload generator
 - [x] **Phase 2 — Dataset:** generate slow-query scenarios with labelled good indexes; publish to Hugging Face Datasets — 🤗 [krishna382nitjsr/index-drift-rl-bench](https://huggingface.co/datasets/krishna382nitjsr/index-drift-rl-bench)
 - [x] **Phase 3 — Baselines:** rule-based advisor + zero-shot LLM baselines — [results](docs/results/baselines.md)
-- [ ] **Phase 4 — Reward harness:** HypoPG cost-delta reward + SQL safety checks, with unit tests
+- [x] **Phase 4 — Reward harness:** HypoPG cost-delta reward + SQL safety checks, with unit tests — [design & audit](docs/results/reward_audit.md)
 - [ ] **Phase 5 — Training:** optional SFT warm-up for output format, then GRPO on free GPU (Kaggle / Colab)
 - [ ] **Phase 6 — Vector indexes:** offline HNSW / quantization benchmark table and vector-tuning task
 - [ ] **Phase 7 — Release:** LoRA adapter on HF Hub, Gradio demo Space, write-up comparing against baselines
@@ -218,6 +220,9 @@ python -m src.publish_dataset --repo <hf-user>/index-drift-rl-bench   # private 
 python -m src.baselines run --baseline rule --split test
 python -m src.baselines run --baseline ollama:qwen2.5-coder:1.5b --split test --limit 200
 python -m src.baselines report      # writes docs/results/baselines.md
+
+# 8. Reward (Phase 4): optional real-latency calibration (builds real indexes, ~10 min)
+python -m src.environment calibrate
 
 # Tests (DB tests are skipped unless the sandbox is up and seeded)
 pytest

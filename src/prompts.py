@@ -31,6 +31,27 @@ def single_prompt(example: dict) -> str:
     )
 
 
+WINDOW_BUDGET = 3  # matches build_dataset --budget (dataset card)
+
+
+def window_prompt(example: dict, budget: int = WINDOW_BUDGET) -> str:
+    """User message for a ``windows`` task example."""
+    schema = "\n".join(example["schema"])
+    existing = "\n".join(f"{d};" for d in example["existing_indexes"]) or "(none - primary keys only)"
+    total = sum(w["count"] for w in example["workload"])
+    workload = "\n".join(f"- {w['count']} of {total} queries ({w['share']:.0%}), e.g.: {w['example_query']}"
+                         for w in example["workload"])
+    return (
+        f"Schema:\n{schema}\n\n"
+        f"Current secondary indexes:\n{existing}\n\n"
+        f"Query workload in the latest window:\n{workload}\n\n"
+        f"Decide which B-tree indexes this database should have now, at most {budget} in total. "
+        "Reply only with SQL statements: `DROP INDEX CONCURRENTLY <name>;` for each index to remove and "
+        "`CREATE INDEX CONCURRENTLY <name> ON <table> (...);` for each index to add. "
+        "Reply `NO CHANGES` if the current indexes are already right. Do not explain."
+    )
+
+
 _CREATE_RE = re.compile(r"CREATE\s+(?:UNIQUE\s+)?INDEX\b[^;]*", re.IGNORECASE | re.DOTALL)
 _NONE_RE = re.compile(r"\bNO\s+INDEX\b", re.IGNORECASE)
 
