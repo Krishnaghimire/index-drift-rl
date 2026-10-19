@@ -53,10 +53,14 @@ def reward_fields(example: dict) -> str:
 
 
 def _dtype():
+    """bfloat16 on GPUs with native support (Ampere+); otherwise float32.
+
+    Never float16: Qwen2.5 overflows in float16. On a T4 it collapsed to
+    answering "NO INDEX" to almost everything (first Kaggle run)."""
     import torch
 
-    if torch.cuda.is_available():
-        return torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
+        return torch.bfloat16
     return torch.float32
 
 
@@ -73,6 +77,8 @@ def load_model(model_name: str, adapter: Path | None = None):
 
         model = PeftModel.from_pretrained(model, str(adapter))
     model.to("cuda" if torch.cuda.is_available() else "cpu").eval()
+    device = torch.cuda.get_device_name() if torch.cuda.is_available() else "cpu"
+    print(f"[model] {model_name}{' + ' + str(adapter) if adapter else ''} on {device}, {model.dtype}", flush=True)
     return model, tokenizer
 
 
@@ -157,7 +163,8 @@ def run_grpo(args) -> Path:
         temperature=1.0,
         beta=0.0,
         bf16=dtype == torch.bfloat16,
-        fp16=dtype == torch.float16,
+        fp16=False,
+        use_cpu=not torch.cuda.is_available(),
         gradient_checkpointing=torch.cuda.is_available(),
         gradient_checkpointing_kwargs={"use_reentrant": False},
         logging_steps=args.logging_steps,
@@ -195,8 +202,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--latency-table", type=Path, default=LATENCY_TABLE)
     parser.add_argument("--steps", type=int, default=300)
     parser.add_argument("--lr", type=float, default=2e-5)
-    parser.add_argument("--batch-size", type=int, default=8, help="completions per device per micro-batch")
-    parser.add_argument("--grad-accum", type=int, default=2)
+    parser.add_argument("--batch-size", type=int, default=4, help="completions per device per micro-batch")
+    parser.add_argument("--grad-accum", type=int, default=4, help="micro-batches per step (4 x 4 = 16 = 2 prompts x 8)")
     parser.add_argument("--num-generations", type=int, default=8, help="completions per prompt (the GRPO group)")
     parser.add_argument("--max-completion", type=int, default=96)
     parser.add_argument("--lora-r", type=int, default=16)
