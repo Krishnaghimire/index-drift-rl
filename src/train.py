@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -214,6 +215,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--eval-batch", type=int, default=16)
     parser.add_argument("--smoke", action="store_true", help="tiny model and sizes, for a quick pipeline test")
     args = parser.parse_args(argv)
+
+    # One process = one GPU. With two GPUs visible (Kaggle "T4 x2"), Trainer
+    # falls back to nn.DataParallel, which GRPOTrainer rejects. Must be set
+    # before torch initialises CUDA (torch is only imported inside functions).
+    if "WORLD_SIZE" not in os.environ:
+        os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
 
     if args.smoke:
         args.model, args.steps, args.eval_limit, args.train_limit = SMOKE_MODEL, 2, 4, 16
