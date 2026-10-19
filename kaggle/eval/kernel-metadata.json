@@ -1,0 +1,17 @@
+{
+  "id": "krishna382nitjsr/index-drift-rl-eval",
+  "title": "index-drift-rl eval",
+  "code_file": "eval.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [
+    "krishna382nitjsr/index-drift-rl-grpo"
+  ],
+  "model_sources": []
+}

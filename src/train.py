@@ -188,6 +188,15 @@ def run_grpo(args) -> Path:
     (args.out / "train_log.json").write_text(json.dumps(trainer.state.log_history, indent=2), encoding="utf-8")
     env.close()
     print(f"[grpo] adapter saved to {adapter_dir}", flush=True)
+    # Free the GPU before evaluation loads a fresh copy of the model: Trainer
+    # holds reference cycles, so dropping names alone is not enough (run 3
+    # ran out of memory here on a T4).
+    import gc
+
+    del trainer, model
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     return adapter_dir
 
 
